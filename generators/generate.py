@@ -1,5 +1,5 @@
 import os
-
+import re
 from obse.sparql_queries import SparQLWrapper
 from obse.namespace import MBA
 from rdflib import URIRef
@@ -20,8 +20,11 @@ def create_file(path,filename,content):
     with open(p,'w',encoding='UTF-8') as f:
         f.write(content)
 
-def read_file(path):
-    with open(path,'r',encoding='UTF-8') as f:
+def read_file(path,filename):
+    if not os.path.exists(path):
+        raise ValueError(f"{path} must exists.")
+    p = os.path.join(path,filename)
+    with open(p,'r',encoding='UTF-8') as f:
         return f.read()
 
 
@@ -31,7 +34,10 @@ def name2foldername(name):
     
     return name.lower()
 
-
+def name2componentname(name):
+    p = re.split('[-_\s]+', name)
+    p = list(map(  (lambda x : str(x[0]).upper() + x[1:]) ,p))
+    return ''.join(p)
 
 python_types = {
     'string' : 'str',
@@ -48,6 +54,9 @@ class DDSMessage:
     def get_name(self):
         return self.name
     
+    def get_structure(self):
+        return self.structure
+
     def get_properties(self):
         return list(map(lambda e: e[0], self.structure))
        
@@ -62,10 +71,44 @@ class DDSMessage:
 
         return template.content()
 
-class DDSSubscriber:
-    def __init__(self,recv_messages,send_messages):
+class ComponentProxyInterface:
+    def __init__(self,component_name,recv_messages,send_messages):
         self.recv_messages = recv_messages
         self.send_messages = send_messages
+        self.component_name = component_name
+
+    def create_content(self):
+        template = Template("templates/proxy.py.template")
+
+        template.replace("{{component_name}}",self.component_name)
+
+        # Datareader , Datawriter
+        apply_funcs = []
+        for msg in self.recv_messages:
+            params = []
+            for var_name, var_type in msg.get_structure():
+                params.append(f'{var_name} : {python_types[var_type]}')
+            apply_funcs.append(f'@abstractmethod')
+            apply_funcs.append(f'def apply_{msg.get_name()}(self,{", ".join(params)}) -> None: pass')
+
+        callback_funcs = []
+        for msg in self.send_messages:
+            params = []
+            for _, var_type in msg.get_structure():
+                params.append(f'{python_types[var_type]}')
+            callback_funcs.append(f'@abstractmethod')
+            callback_funcs.append(f'def set_{msg.get_name()}_callback(self,callback : Callable[[{",".join(params)}], None]) -> None: pass')
+
+        template.replace("{{callback_funcs}}",callback_funcs)
+        template.replace("{{apply_funcs}}",apply_funcs)
+
+        return template.content()
+
+class DDSSubscriber:
+    def __init__(self,recv_messages,send_messages,proxy_name):
+        self.recv_messages = recv_messages
+        self.send_messages = send_messages
+        self.proxy_name = proxy_name
 
     def create_content(self):
         template = Template("templates/subscriber.py.template")
@@ -78,6 +121,7 @@ class DDSSubscriber:
             topics.append(f'topic{msg.get_name()} = Topic(dp, "{msg.get_name()}Topic", {msg.get_name()}, qos=Qos(Policy.Reliability.Reliable(0)))')
         
         template.replace("{{message_imports}}",message_imports)
+        template.replace("{{proxy_import}}",f"from src.{self.proxy_name} import {self.proxy_name}")
         template.replace("{{topics}}",topics)
 
         # Datareader , Datawriter
@@ -91,34 +135,43 @@ class DDSSubscriber:
         template.replace("{{data_writer}}",data_writer)
      
         # Write message
-        write_message = []
-        if len(self.send_messages) > 0:
-            msg = self.send_messages[0]
-            params = []
+        apply_funcs = []
+        for msg in self.send_messages:
+            params1 = []
+            params2 = []
             properties = msg.get_properties()
-            for i in range(len(properties)):
-                params.append(f'{properties[i]}=params[{i}]')
+            for var_name, var_type in msg.get_structure():
+                params1.append(f'{var_name} : {python_types[var_type]}')
+                params2.append(f'{var_name}={var_name}')
 
-            write_message.append(f'message = {msg.get_name()}({",".join(params)})')
-            write_message.append(f'dw{msg.get_name()}.write(message)')
+            apply_funcs.append(f'def apply_{msg.get_name()}({", ".join(params1)}):')
+            apply_funcs.append(f'    message = {msg.get_name()}({", ".join(params2)})')
+            apply_funcs.append('    logging.info(f"Send Message {message}")') #no format
+            apply_funcs.append(f'    dw{msg.get_name()}.write(message)')
 
-        template.replace("{{write_message}}",write_message)
+        template.replace("{{apply_funcs}}",apply_funcs)
 
+        # Init self.proxy_name
+        proxy = []
+        proxy.append(f"proxy = {self.proxy_name}()")
+        for msg in self.send_messages:
+            proxy.append(f"proxy.set_{msg.get_name()}_callback(apply_{msg.get_name()})")
+
+        template.replace("{{proxy}}",proxy)
 
     	# Read Messages
-        read_message = []
-        if len(self.recv_messages) > 0:
-            msg = self.recv_messages[0]
+        read_messages = []
+        for msg in self.recv_messages:
             params = []
             properties = msg.get_properties()
             for i in range(len(properties)):
-                params.append(f'message.{properties[i]}')
-            
-            read_message.append(f'for message in dr{msg.get_name()}.take(10):')
-            read_message.append('    logging.info(f"Recv Message {message}")') #ohne format
-            read_message.append(f'    proxy.apply([{",".join(params)}])')
+                params.append(f'{properties[i]} = message.{properties[i]}')
 
-        template.replace("{{read_message}}",read_message)
+            read_messages.append(f'for message in dr{msg.get_name()}.take(10):')
+            read_messages.append('    logging.info(f"Recv Message {message}")') #ohne format
+            read_messages.append(f'    proxy.apply_{msg.get_name()}({",".join(params)})')
+
+        template.replace("{{read_messages}}",read_messages)
 
       
 
@@ -143,7 +196,11 @@ def get_message_structure(sparql_wrapper: SparQLWrapper,rdf_message):
 def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     name = sparql_wrapper.get_single_object_property(rdf_component,MBA.name)
     foldername = name2foldername(name)
+    componentname = name2componentname(name)
+
     project_path = create_path(path,foldername)
+    proxy_path = create_path("proxy",foldername)
+
     src_path = create_path(project_path,'src')
 
     # Create README.md
@@ -186,16 +243,26 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     init_py = Template("templates/__init__.py")
     create_file(src_path,"__init__.py",init_py.content())
 
-    # Copy Proxy and requirements.txt
-    proxy_py = read_file("proxy/proxy.py")
-    create_file(src_path,"proxy.py",proxy_py)
 
-    #TODO copy component proxy
-    mocks_py = read_file("proxy/mocks.py")
-    create_file(src_path,"mocks.py",mocks_py)
+    # Create ProxyInterface
+    interface_name = f"{componentname}ProxyInterface"
+    proxy_name = f"{componentname}Proxy"
+    proxy_interface_py = ComponentProxyInterface(interface_name,recv_messages,send_messages)
+
+    create_file(proxy_path,f"{interface_name}.py",proxy_interface_py.create_content())
+
+    # Copy Proxy proxy interface 
+    proxy_py = read_file(proxy_path,f"{interface_name}.py")
+    create_file(src_path,f"{interface_name}.py",proxy_py)
+
+    # Copy component proxy implementation
+    mocks_py = read_file(proxy_path,f"{proxy_name}.py")
+    create_file(src_path,f"{proxy_name}.py",mocks_py)
+
+    # TODO copy requirements.txt
 
     #TODO generate subscriber from proxy 
-    subscriber_py = DDSSubscriber(recv_messages,send_messages)
+    subscriber_py = DDSSubscriber(recv_messages,send_messages,proxy_name)
     create_file(project_path,"subscriber.py",subscriber_py.create_content())
 
     return foldername

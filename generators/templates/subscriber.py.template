@@ -8,7 +8,11 @@ import logging
 
 {{message_imports}}
 
-from src.mocks import ProxyMock
+{{proxy_import}}
+
+
+logging.basicConfig(level=logging.INFO)
+
 
 dp = DomainParticipant()
 
@@ -17,21 +21,16 @@ dp = DomainParticipant()
 {{data_writer}}
 
 
-
-def apply(params):
-    logging.info(f"Call back Sends {params}")
-    {{write_message}}
+{{apply_funcs}}
 
 
 
+{{proxy}}
 
-proxy = ProxyMock()
-proxy.set_callback(apply)
 
-logging.basicConfig(level=logging.INFO)
 
 logging.info('Started')
 
 while True:
-    {{read_message}}
+    {{read_messages}}
     time.sleep(1)
