@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+from generators import __version__
+from generators.generate import generate
+from rdflib import Graph
+import argparse
+import os
+
+def dir_path(path):
+    if os.path.isdir(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"{path} is not a valid path")
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Converting rdf model to system.")
+
+    parser.add_argument("--version", action='version', version=f'%(prog)s (version {__version__})')
+    parser.add_argument("--model", required=True, metavar="INPUT", help="model")
+    parser.add_argument("--path", required=True, metavar="OUTPUT", type=dir_path, help="output directory")
+    args = parser.parse_args()
+    return args.model , args.path
+
+
+
+model, path = parse_args()
+
+graph = Graph()
+graph.parse(model)
+
+
+generate(graph,path)
