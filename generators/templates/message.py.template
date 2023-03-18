@@ -1,0 +1,8 @@
+from dataclasses import dataclass
+from cyclonedds.idl import IdlStruct
+from cyclonedds.idl.annotations import key
+
+
+@dataclass
+class {{MessageClassName}}(IdlStruct, typename="{{MessageClassName}}"):
+   {{properties}}
