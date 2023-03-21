@@ -207,10 +207,6 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     readme = Template("templates/README.md")
     create_file(project_path,"README.md",readme.content())
     
-    # Create Dockerfile
-    dockerfile = Template("templates/Dockerfile")
-    create_file(project_path,"Dockerfile",dockerfile.content())
-
     # Create dds-modul
     cyclone_dds_xml = Template("templates/cyclonedds.xml")
     create_file(project_path,"cyclonedds.xml",cyclone_dds_xml.content())
@@ -251,19 +247,23 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
 
     create_file(proxy_path,f"{interface_name}.py",proxy_interface_py.create_content())
 
-    # Copy Proxy proxy interface 
-    proxy_py = read_file(proxy_path,f"{interface_name}.py")
-    create_file(src_path,f"{interface_name}.py",proxy_py)
-
-    # Copy component proxy implementation
-    mocks_py = read_file(proxy_path,f"{proxy_name}.py")
-    create_file(src_path,f"{proxy_name}.py",mocks_py)
-
-    # TODO copy requirements.txt
+    # Copy python files from proxy
+    for file in os.listdir(proxy_path):
+        if file == "docker.txt": continue
+        content = read_file(proxy_path,file)
+        create_file(src_path,file,content)
 
     #TODO generate subscriber from proxy 
     subscriber_py = DDSSubscriber(recv_messages,send_messages,proxy_name)
     create_file(project_path,"subscriber.py",subscriber_py.create_content())
+
+    # Create Dockerfile
+    dockerfile = Template("templates/Dockerfile.template")
+    docker_txt = ""
+    if os.path.isfile(f"{proxy_path}/docker.txt"):
+        docker_txt = read_file(proxy_path,"docker.txt")
+    dockerfile.replace("{{include}}",docker_txt)
+    create_file(project_path,"Dockerfile",dockerfile.content())
 
     return foldername
 
