@@ -20,6 +20,17 @@ def create_file(path,filename,content):
     with open(p,'w',encoding='UTF-8') as f:
         f.write(content)
 
+def read_lines(path,filename,must_exists = True):
+    if not os.path.exists(path):
+        raise ValueError(f"{path} must exists.")
+    p = os.path.join(path,filename)
+    if not os.path.exists(p):
+        if must_exists:
+            raise ValueError(f"{p} must exists.")
+        return []
+    with open(p,'r',encoding='UTF-8') as f:
+        return f.readlines()
+
 def read_file(path,filename):
     if not os.path.exists(path):
         raise ValueError(f"{path} must exists.")
@@ -250,6 +261,8 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     # Copy python files from proxy
     for file in os.listdir(proxy_path):
         if file == "docker.txt": continue
+        if file == "wrapper.txt": continue
+        
         content = read_file(proxy_path,file)
         create_file(src_path,file,content)
 
@@ -257,11 +270,17 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     subscriber_py = DDSSubscriber(recv_messages,send_messages,proxy_name)
     create_file(project_path,"subscriber.py",subscriber_py.create_content())
 
+    # create wrapper.sh
+    wrapper_sh = Template("templates/wrapper.sh.template")
+    wrapper_txt = read_lines(proxy_path,"wrapper.txt",must_exists=False)
+    wrapper_txt.append("#Start subscriber")
+    wrapper_txt.append("python subscriber.py &")
+    wrapper_sh.replace("{{include}}",wrapper_txt)
+    create_file(project_path,"wrapper.sh",wrapper_sh.content())
+
     # Create Dockerfile
     dockerfile = Template("templates/Dockerfile.template")
-    docker_txt = ""
-    if os.path.isfile(f"{proxy_path}/docker.txt"):
-        docker_txt = read_file(proxy_path,"docker.txt")
+    docker_txt = read_lines(proxy_path,"docker.txt",must_exists=False)
     dockerfile.replace("{{include}}",docker_txt)
     create_file(project_path,"Dockerfile",dockerfile.content())
 

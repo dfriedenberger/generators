@@ -5,14 +5,20 @@ WORKDIR /app
 RUN python -m pip install --upgrade pip
 RUN pip install numpy cyclonedds
 
+{{include}}
+
 COPY src src
 COPY subscriber.py subscriber.py
 COPY loop.py loop.py
 COPY pub.py pub.py
 COPY cyclonedds.xml cyclonedds.xml
 
-{{include}}
 
 ENV CYCLONEDDS_URI file:///app/cyclonedds.xml
-CMD python subscriber.py
+
+COPY wrapper.sh wrapper.sh
+RUN apt-get update && apt-get -y install dos2unix 
+RUN dos2unix wrapper.sh
+RUN chmod 0700 wrapper.sh
+CMD ./wrapper.sh
 #CMD python loop.py
