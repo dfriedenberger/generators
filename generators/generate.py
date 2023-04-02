@@ -4,6 +4,7 @@ from obse.sparql_queries import SparQLWrapper
 from obse.namespace import MBA
 from rdflib import URIRef
 from .template import Template
+from .project_copier import ProjectCopier
 
 def create_path(path,subpath):
     if not os.path.exists(path):
@@ -211,6 +212,7 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
 
     project_path = create_path(path,foldername)
     proxy_path = create_path("proxy",foldername)
+    proxy_src_path = create_path(proxy_path,"src")
 
     src_path = create_path(project_path,'src')
 
@@ -256,14 +258,16 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     proxy_name = f"{componentname}Proxy"
     proxy_interface_py = ComponentProxyInterface(interface_name,recv_messages,send_messages)
 
-    create_file(proxy_path,f"{interface_name}.py",proxy_interface_py.create_content())
+    create_file(proxy_src_path,f"{interface_name}.py",proxy_interface_py.create_content())
 
     # Copy python files from proxy
-    for file in os.listdir(proxy_path):
+    project_copier = ProjectCopier(source_path = proxy_path,target_path=project_path)
+    project_copier.copy()
+    for file in os.listdir(proxy_src_path):
         if file == "docker.txt": continue
         if file == "wrapper.txt": continue
-        
-        content = read_file(proxy_path,file)
+        if file == "__pycache__": continue
+        content = read_file(proxy_src_path,file)
         create_file(src_path,file,content)
 
     #TODO generate subscriber from proxy 
