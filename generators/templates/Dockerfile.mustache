@@ -5,7 +5,7 @@ WORKDIR /app
 RUN python -m pip install --upgrade pip
 RUN pip install numpy cyclonedds
 
-{{include}}
+{{{include}}}
 
 COPY src src
 COPY subscriber.py subscriber.py

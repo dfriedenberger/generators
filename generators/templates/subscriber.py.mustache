@@ -1,0 +1,62 @@
+from cyclonedds.domain import DomainParticipant
+from cyclonedds.core import Qos, Policy
+from cyclonedds.sub import DataReader
+from cyclonedds.pub import DataWriter
+from cyclonedds.topic import Topic
+import time
+import logging
+
+{{#message_imports}}
+from {{package}} import {{name}}
+{{/message_imports}}
+
+
+{{#proxy_import}}
+from {{package}} import {{name}}
+{{/proxy_import}}
+
+
+logging.basicConfig(level=logging.INFO)
+
+
+dp = DomainParticipant()
+
+{{#topics}}
+topic{{name}} = Topic(dp, "{{name}}Topic", {{name}}, qos=Qos(Policy.Reliability.Reliable(0)))
+{{/topics}}
+
+
+{{#data_reader}}
+dr{{name}} = DataReader(dp, topic{{name}})
+{{/data_reader}}
+
+{{#data_writer}}
+dw{{name}} = DataWriter(dp, topic{{name}})
+{{/data_writer}}
+
+
+{{#apply_funcs}}
+def apply_{{name}}({{parameters}}):
+    message = {{name}}({{parameters2}})
+    logging.info(f"Send Message {message}") #no format
+    dw{{name}}.write(message)
+{{/apply_funcs}}
+
+
+
+proxy = {{proxy_name}}()
+
+{{#proxy_callbacks}}
+proxy.set_{{name}}_callback(apply_{{name}})
+{{/proxy_callbacks}}
+
+
+logging.info('Started')
+
+while True:
+    {{#read_messages}}
+    for message in dr{{name}}.take(10):
+        logging.info(f"Recv Message {message}") #ohne format
+        proxy.apply_{{name}}({{parameters}})
+    {{/read_messages}}
+    time.sleep(1)

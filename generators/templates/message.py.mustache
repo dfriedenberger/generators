@@ -5,4 +5,6 @@ from cyclonedds.idl.annotations import key
 
 @dataclass
 class {{MessageClassName}}(IdlStruct, typename="{{MessageClassName}}"):
-   {{properties}}
+{{#properties}}
+   {{name}} : {{type}}
+{{/properties}}

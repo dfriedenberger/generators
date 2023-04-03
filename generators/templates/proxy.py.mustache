@@ -1,0 +1,17 @@
+from abc import ABC, abstractmethod
+from typing import Callable
+
+class {{component_name}}(ABC):
+
+    {{#callback_funcs}}       
+    @abstractmethod
+    def set_{{name}}_callback(self,callback : Callable[[{{parameters}}], None]) -> None: pass
+    {{/callback_funcs}}       
+  
+    {{#apply_funcs}}   
+    @abstractmethod
+    def apply_{{name}}(self,{{parameters}}) -> None: pass
+    {{/apply_funcs}}   
+
+
+
