@@ -54,12 +54,20 @@ def name2componentname(name):
 python_types = {
     'string' : 'str',
     'uint8' : 'int',
-    'uint16' : 'int'
+    'uint16' : 'int',
+    'bytes' : 'bytes'
 }
+
+python_dds_types = {
+    'string' : 'str',
+    'uint8' : 'int',
+    'uint16' : 'int',
+    'bytes' : 'sequence[int]'
+}
+
 
 class DDSMessage:
     def __init__(self,name,structure):
-     
         self.name = name
         self.structure = structure
 
@@ -80,7 +88,7 @@ class DDSMessage:
         for var_name, var_type in self.structure:
             properties.append({
                 "name" : var_name,
-                "type" : python_types[var_type]
+                "type" : python_dds_types[var_type]
             })
         template.set("properties",properties)
 
@@ -125,6 +133,29 @@ class ComponentProxyInterface:
 
         return template.content()
 
+
+def message_to_property_list(message):
+    property_list = []
+    for var_name, var_type in message.get_structure():
+            property_list.append({
+                    "name" : var_name,
+                    "type" : python_types[var_type]
+            })
+    property_list[-1]['last'] = True
+    return property_list
+
+def messages_to_list(messages):
+    message_list = []
+    for msg in messages:
+            message_list.append({
+                'package' : f'src.{msg.get_name()}',
+                'name' : msg.get_name(),
+                'parameters' : message_to_property_list(msg)
+            })
+    return message_list
+
+
+
 class DDSSubscriber:
     def __init__(self,recv_messages,send_messages,proxy_name):
         self.recv_messages = recv_messages
@@ -135,74 +166,30 @@ class DDSSubscriber:
         template = Template("templates/subscriber.py.mustache")
 
         # Message Imports and Topics
-        message_imports = []
-        topics = []
-
-        for msg in self.send_messages + self.recv_messages:
-            message_imports.append({
-                'package' : f'src.{msg.get_name()}',
-                'name' : msg.get_name()
-            })
-            topics.append({"name" : msg.get_name()})
-        
         proxy_import = []
         proxy_import.append({
             'package' : f'src.{self.proxy_name}',
             'name' : self.proxy_name
         })
-        template.set("message_imports",message_imports)
+
+        template.set("message_imports",messages_to_list(self.send_messages + self.recv_messages))
         template.set("proxy_import",proxy_import)
-        template.set("topics",topics)
+        template.set("topics",messages_to_list(self.send_messages + self.recv_messages))
 
         # Datareader , Datawriter
-        data_reader = []
-        for msg in self.recv_messages:
-            data_reader.append({'name' : msg.get_name()})
-        data_writer = []
-
-        for msg in self.send_messages:
-            data_writer.append({'name' : msg.get_name()})
-
-        template.set("data_reader",data_reader)
-        template.set("data_writer",data_writer)
+        template.set("data_reader",self.recv_messages)
+        template.set("data_writer",self.send_messages)
      
         # Write message
-        apply_funcs = []
-        for msg in self.send_messages:
-            params1 = []
-            params2 = []
-            properties = msg.get_properties()
-            for var_name, var_type in msg.get_structure():
-                params1.append(f'{var_name} : {python_types[var_type]}')
-                params2.append(f'{var_name}={var_name}')
-            apply_funcs.append({
-                'name' : msg.get_name(),
-                'parameters' : ", ".join(params1),
-                'parameters2' : ", ".join(params2)
-            })
-           
-        template.set("apply_funcs",apply_funcs)
+        template.set("apply_funcs",messages_to_list(self.send_messages))
 
         # Init self.proxy_name
-        proxy_callbacks = []
-        for msg in self.send_messages:
-            proxy_callbacks.append({'name' : msg.get_name()})
         template.set("proxy_name",self.proxy_name)
-        template.set("proxy_callbacks",proxy_callbacks)
+        template.set("proxy_callbacks",messages_to_list(self.send_messages))
 
     	# Read Messages
-        read_messages = []
-        for msg in self.recv_messages:
-            params = []
-            properties = msg.get_properties()
-            for i in range(len(properties)):
-                params.append(f'{properties[i]} = message.{properties[i]}')
-            read_messages.append({
-                'name' : msg.get_name(),
-                'parameters' : ",".join(params)
-            })
-           
-        template.set("read_messages",read_messages)
+        template.set("read_messages",messages_to_list(self.recv_messages))
+        
         return template.content()
     
 
@@ -313,13 +300,12 @@ def generate(graph,output_path):
     '''
         Generate projects
     '''
-    dds_path = create_path(output_path,'dds')
     services = []
     for rdf_component in sparql_wrapper.get_instances_of_type(MBA.Component):
         impl = sparql_wrapper.get_object_properties(rdf_component,MBA.implement)
         if 'dds' in impl:
             print(rdf_component,impl)
-            project_path = generate_dds_project(sparql_wrapper,rdf_component,dds_path)
+            project_path = generate_dds_project(sparql_wrapper,rdf_component,output_path)
             services.append({
                 "name" : f"peer-{project_path}" , 
                 "build" : f"{project_path}" 
@@ -328,7 +314,7 @@ def generate(graph,output_path):
 
     docker_compose_yml = Template("templates/docker-compose.yml.mustache")
     docker_compose_yml.set('services', services)
-    create_file(dds_path,"docker-compose.yml",docker_compose_yml.content())
+    create_file(output_path,"docker-compose.yml",docker_compose_yml.content())
 
 
     '''

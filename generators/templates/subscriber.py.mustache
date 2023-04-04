@@ -36,8 +36,8 @@ dw{{name}} = DataWriter(dp, topic{{name}})
 
 
 {{#apply_funcs}}
-def apply_{{name}}({{parameters}}):
-    message = {{name}}({{parameters2}})
+def apply_{{name}}({{#parameters}}{{name}} : {{type}}{{^last}}, {{/last}}{{/parameters}}):
+    message = {{name}}({{#parameters}}{{name}} = {{name}}{{^last}}, {{/last}}{{/parameters}})
     logging.info(f"Send Message {message}") #no format
     dw{{name}}.write(message)
 {{/apply_funcs}}
@@ -57,6 +57,6 @@ while True:
     {{#read_messages}}
     for message in dr{{name}}.take(10):
         logging.info(f"Recv Message {message}") #ohne format
-        proxy.apply_{{name}}({{parameters}})
+        proxy.apply_{{name}}({{#parameters}}{{name}} = {{type}}(message.{{name}}){{^last}}, {{/last}}{{/parameters}})
     {{/read_messages}}
     time.sleep(1)
