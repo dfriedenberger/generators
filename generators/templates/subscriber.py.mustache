@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 dp = DomainParticipant()
 
 {{#topics}}
-topic{{name}} = Topic(dp, "{{name}}Topic", {{name}}, qos=Qos(Policy.Reliability.Reliable(0)))
+topic{{name}} = Topic(dp, "{{name}}Topic", {{msg_type}}, qos=Qos(Policy.Reliability.Reliable(0)))
 {{/topics}}
 
 
@@ -36,10 +36,13 @@ dw{{name}} = DataWriter(dp, topic{{name}})
 
 
 {{#apply_funcs}}
-def apply_{{name}}({{#parameters}}{{name}} : {{type}}{{^last}}, {{/last}}{{/parameters}}):
-    message = {{name}}({{#parameters}}{{name}} = {{name}}{{^last}}, {{/last}}{{/parameters}})
-    logging.info(f"Send Message {message}") #no format
-    dw{{name}}.write(message)
+def apply_{{name}}({{data_name}} : {{data_type}}):
+    {{! TODO
+        message = AudioMessage(caller_id = audio_message.caller_id,audio = audio_message.audio ) 
+    }}
+    {{msg_name}} : {{msg_type}} = {{data_name}}
+    logging.info("Send Message " + str({{msg_name}}))
+    dw{{name}}.write({{msg_name}})
 {{/apply_funcs}}
 
 
@@ -55,8 +58,11 @@ logging.info('Started')
 
 while True:
     {{#read_messages}}
-    for message in dr{{name}}.take(10):
-        logging.info(f"Recv Message {message}") #ohne format
-        proxy.apply_{{name}}({{#parameters}}{{name}} = {{type}}(message.{{name}}){{^last}}, {{/last}}{{/parameters}})
+    for {{msg_name}} in dr{{name}}.take(10):
+        logging.info("Recv Message " + str({{msg_name}}))
+        {{! TODO
+            proxy.apply_ZLiCAudio(audio_message = AudioMessage(caller_id = message.caller_id,audio = message.audio))
+        }}
+        proxy.apply_{{name}}({{data_name}} = {{data_type}}({{msg_name}}))
     {{/read_messages}}
     time.sleep(1)

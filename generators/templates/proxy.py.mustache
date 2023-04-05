@@ -1,16 +1,19 @@
 from abc import ABC, abstractmethod
 from typing import Callable
+{{#message_imports}}
+from {{package}} import {{name}}
+{{/message_imports}}
 
 class {{component_name}}(ABC):
 
     {{#callback_funcs}}       
     @abstractmethod
-    def set_{{name}}_callback(self,callback : Callable[[{{parameters}}], None]) -> None: pass
+    def set_{{name}}_callback(self,callback : Callable[[{{data_type}}], None]) -> None: pass
     {{/callback_funcs}}       
   
     {{#apply_funcs}}   
     @abstractmethod
-    def apply_{{name}}(self,{{parameters}}) -> None: pass
+    def apply_{{name}}(self,{{data_name}} : {{data_type}}) -> None: pass
     {{/apply_funcs}}   
 
 

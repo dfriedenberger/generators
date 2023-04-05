@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from cyclonedds.idl import IdlStruct
-from cyclonedds.idl.annotations import key
-from cyclonedds.idl.types import sequence
+from typing import List
 
+{{#message_imports}}
+from {{package}} import {{name}}
+{{/message_imports}}
 
 @dataclass
-class {{MessageClassName}}(IdlStruct, typename="{{MessageClassName}}"):
+class {{MessageClassName}}():
 {{#properties}}
    {{name}} : {{type}}
 {{/properties}}
