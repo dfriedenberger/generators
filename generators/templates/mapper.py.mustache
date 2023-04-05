@@ -1,0 +1,30 @@
+import time
+import logging
+
+{{#message_imports}}
+from {{package}} import {{name}}
+{{/message_imports}}
+
+def map_array(map_func,l):
+    nl = []
+    for e in l:
+        nl.append(map_func(e))
+    return nl
+
+{{#mapper}}
+def map_{{from_type}}_to_{{to_type}}(value : {{from_type}}):
+    return {{to_type}}(
+        {{#properties}}
+            {{#nocast}}
+                {{to_name}} = value.{{from_name}}{{^last}},{{/last}}
+            {{/nocast}}
+            {{#cast}}
+                {{to_name}} = {{cast}}(value.{{from_name}}){{^last}},{{/last}}
+            {{/cast}}
+            {{#arraycast}}
+                {{to_name}} = map_array({{arraycast}},value.{{from_name}}){{^last}},{{/last}}
+            {{/arraycast}}
+        {{/properties}}
+        )
+
+{{/mapper}}

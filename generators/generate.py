@@ -11,6 +11,7 @@ from .util.util import snake_case
 from .base_data_structure_generator import DDSDataStructureGenerator, DataStructureGenerator
 from .component_proxy_interface_generator import ComponentProxyInterfaceGenerator
 from .dds_subscriber_generator import DDSSubscriberGenerator
+from .dds_data_structure_mapper_generator import DDSDataStructureMapperGenerator
 
 def create_path(path,subpath):
     if not os.path.exists(path):
@@ -212,6 +213,10 @@ def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
         for structure in msg.get_msg_structures():
             data_structure_py = DDSDataStructureGenerator(structure.get_name(),structure.get_data_properties())
             create_file(src_path,f"{structure.get_name()}.py",data_structure_py.create_content())
+
+    # Create Mapper
+    mapper_py = DDSDataStructureMapperGenerator(recv_messages,send_messages)
+    create_file(src_path,"mapper.py",mapper_py.create_content())
 
 
     #TODO generate subscriber from proxy 

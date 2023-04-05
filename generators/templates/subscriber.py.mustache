@@ -10,6 +10,7 @@ import logging
 from {{package}} import {{name}}
 {{/message_imports}}
 
+from src.mapper import *
 
 {{#proxy_import}}
 from {{package}} import {{name}}
@@ -39,8 +40,9 @@ dw{{name}} = DataWriter(dp, topic{{name}})
 def apply_{{name}}({{data_name}} : {{data_type}}):
     {{! TODO
         message = AudioMessage(caller_id = audio_message.caller_id,audio = audio_message.audio ) 
+        Transformation
     }}
-    {{msg_name}} : {{msg_type}} = {{data_name}}
+    {{msg_name}} : {{msg_type}} = map_{{data_type}}_to_{{msg_type}}({{data_name}})
     logging.info("Send Message " + str({{msg_name}}))
     dw{{name}}.write({{msg_name}})
 {{/apply_funcs}}
@@ -63,6 +65,7 @@ while True:
         {{! TODO
             proxy.apply_ZLiCAudio(audio_message = AudioMessage(caller_id = message.caller_id,audio = message.audio))
         }}
-        proxy.apply_{{name}}({{data_name}} = {{data_type}}({{msg_name}}))
+        {{data_name}} : {{data_type}} = map_{{msg_type}}_to_{{data_type}}({{msg_name}})
+        proxy.apply_{{name}}({{data_name}} = {{data_name}})
     {{/read_messages}}
     time.sleep(1)
