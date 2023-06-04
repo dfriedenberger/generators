@@ -1,6 +1,13 @@
 version: "3.9"
 services:
   {{#services}}
-    {{name}}:
+    peer-{{name}}:
       build: {{build}}
+      image: {{image}}
+{{#port}}
+      ports:
+        - {{port}}:{{port}}
+      environment:
+        - SERVER_PORT={{port}}
+{{/port}}
   {{/services}}

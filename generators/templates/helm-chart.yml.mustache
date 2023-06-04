@@ -1,0 +1,39 @@
+{{#pods}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{name}}-pod
+  labels:
+    app: {{name}}
+spec:
+  containers:
+  - name: {{name}}
+    image: {{image}}
+{{#port}}
+    ports:
+    - containerPort: {{port}}
+      name: web
+    env:
+    - name: SERVER_PORT
+      value: {{port}}
+{{/port}}
+  imagePullSecrets:
+  - name: reg.osmhpi.de
+---
+{{/pods}}
+{{#services}}
+{{#port}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{name}}-service
+spec:
+  selector:
+    app: {{name}}
+  ports:
+  - port: {{port}}
+    targetPort: web
+  type: LoadBalancer
+---
+{{/port}}
+{{/services}}

@@ -136,7 +136,7 @@ def clone_structures(structures):
 
     return msg_structures
 
-def  generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
+def generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     name = sparql_wrapper.get_single_object_property(rdf_component,MBA.name)
     foldername = name2foldername(name)
     componentname = name2componentname(name)
@@ -252,13 +252,33 @@ def generate(graph,output_path):
         if 'dds' in impl:
             print(rdf_component,impl)
             project_path = generate_dds_project(sparql_wrapper,rdf_component,output_path)
-            services.append({
-                "name" : f"peer-{project_path}" , 
-                "build" : f"{project_path}" 
-            })
+            project_name = project_path.replace("_","-")
+            service = {
+                "name" : f"{project_name}" , 
+                "build" : f"{project_path}",
+                "image" : f"reg.osmhpi.de/flexidug/{project_name}"
+            }
+
+            #if port
+            for rdf_interface in sparql_wrapper.get_out_references(rdf_component,MBA.provides):
+                ports = sparql_wrapper.get_object_properties(rdf_interface,MBA.portnumber)
+                if len(ports) >= 1:
+                    service['port'] = ports[0]
+
+            services.append(service)
 
 
     docker_compose_yml = Template("templates/docker-compose.yml.mustache")
     docker_compose_yml.set('services', services)
     create_file(output_path,"docker-compose.yml",docker_compose_yml.content())
 
+    #Helm chart
+    helm_chart_yaml = Template("templates/helm-chart.yml.mustache")
+    helm_chart_yaml.set('pods', services)
+    helm_chart_yaml.set('services', services)
+    create_file(output_path,"system.yml",helm_chart_yaml.content())
+
+    #Pipeline
+    gitlab_ci_yml = Template("templates/gitlab-ci.yml.mustache")
+    gitlab_ci_yml.set('services', services)
+    create_file(output_path,".gitlab-ci.yml",gitlab_ci_yml.content())

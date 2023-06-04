@@ -62,10 +62,11 @@ while True:
     {{#read_messages}}
     for {{msg_name}} in dr{{name}}.take(10):
         logging.info("Recv Message " + str({{msg_name}}))
-        {{! TODO
-            proxy.apply_ZLiCAudio(audio_message = AudioMessage(caller_id = message.caller_id,audio = message.audio))
-        }}
-        {{data_name}} : {{data_type}} = map_{{msg_type}}_to_{{data_type}}({{msg_name}})
-        proxy.apply_{{name}}({{data_name}} = {{data_name}})
+        try:
+            {{data_name}} : {{data_type}} = map_{{msg_type}}_to_{{data_type}}({{msg_name}})
+            proxy.apply_{{name}}({{data_name}} = {{data_name}})
+        except:
+            logging.error("Cannot map or apply")
+
     {{/read_messages}}
     time.sleep(1)
