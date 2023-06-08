@@ -10,4 +10,12 @@ services:
       environment:
         - SERVER_PORT={{port}}
 {{/port}}
+
+{{#has_volume_mounts}}
+      volumes:
+      {{#volume_secrets}}
+        - {{mount_from}}:{{mount_to}}:ro
+      {{/volume_secrets}}
+{{/has_volume_mounts}}
+
   {{/services}}

@@ -17,6 +17,25 @@ spec:
     - name: SERVER_PORT
       value: {{port}}
 {{/port}}
+{{#has_volume_mounts}}
+    volumeMounts:
+    {{#volume_secrets}}
+      - name: {{name}}-volume
+        mountPath: {{mount_path}}
+        readOnly: true
+    {{/volume_secrets}}
+{{/has_volume_mounts}}
+
+{{#has_volumes}}
+  volumes:
+    {{#volume_secrets}}
+    # The secret data is exposed to Containers in the Pod through a Volume.
+    - name: {{name}}-volume
+      secret:
+        secretName: {{name}}
+    {{/volume_secrets}}
+{{/has_volumes}}
+
   imagePullSecrets:
   - name: reg.osmhpi.de
 ---

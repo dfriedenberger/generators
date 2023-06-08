@@ -136,6 +136,15 @@ def clone_structures(structures):
 
     return msg_structures
 
+def get_asset_dictionary(sparql_wrapper,rdf_use):
+    data = {}
+    for (rdf_prop , rdf_value) in sparql_wrapper.get_out(rdf_use):
+        if not rdf_prop.startswith(MBA.ASSET_URL): 
+            continue
+        key = rdf_prop[len(MBA.ASSET_URL):]
+        data[key] = str(rdf_value)
+    return data
+
 def generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     name = sparql_wrapper.get_single_object_property(rdf_component,MBA.name)
     foldername = name2foldername(name)
@@ -169,10 +178,10 @@ def generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
         for rdf_message in sparql_wrapper.get_out_references(rdf_interface,MBA.has):
             name = sparql_wrapper.get_single_object_property(rdf_message,MBA.name)
             structures = get_message_structure(sparql_wrapper,rdf_message)
-            print("Message",name,structures)
+            #print("Message",name,structures)
 
             msg_structures = clone_structures(structures)
-            print("Message",name,msg_structures)
+            #print("Message",name,msg_structures)
 
             msg_py = DDSMessage(name,structures,msg_structures)
 
@@ -250,7 +259,7 @@ def generate(graph,output_path):
     for rdf_component in sparql_wrapper.get_instances_of_type(MBA.Component):
         impl = sparql_wrapper.get_object_properties(rdf_component,MBA.implement)
         if 'dds' in impl:
-            print(rdf_component,impl)
+            #print(rdf_component,impl)
             project_path = generate_dds_project(sparql_wrapper,rdf_component,output_path)
             project_name = project_path.replace("_","-")
             service = {
@@ -264,6 +273,20 @@ def generate(graph,output_path):
                 ports = sparql_wrapper.get_object_properties(rdf_interface,MBA.portnumber)
                 if len(ports) >= 1:
                     service['port'] = ports[0]
+
+            #if secrets
+            for rdf_use in sparql_wrapper.get_out_references(rdf_component,MBA.use):
+                if sparql_wrapper.get_type(rdf_use) == MBA.Secret:
+
+                    # docker
+                    service['has_volume_mounts'] = True
+                    service['has_volumes'] = True
+
+                    if 'volume_secrets' not in service:
+                        service['volume_secrets'] = []
+
+                    data = get_asset_dictionary(sparql_wrapper,rdf_use)
+                    service['volume_secrets'].append(data)
 
             services.append(service)
 
