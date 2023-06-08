@@ -1,4 +1,4 @@
-{{#pods}}
+{{#pod}}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -11,37 +11,36 @@ spec:
     image: {{image}}
 {{#port}}
     ports:
-    - containerPort: {{port}}
+    - containerPort: {{number}}
       name: web
     env:
     - name: SERVER_PORT
-      value: {{port}}
+      value: {{number}}
 {{/port}}
-{{#has_volume_mounts}}
+{{#has_volume_mount}}
     volumeMounts:
-    {{#volume_secrets}}
+    {{#volume_mount}}
       - name: {{name}}-volume
         mountPath: {{mount_path}}
         readOnly: true
-    {{/volume_secrets}}
-{{/has_volume_mounts}}
+    {{/volume_mount}}
+{{/has_volume_mount}}
 
-{{#has_volumes}}
+{{#has_volume}}
   volumes:
-    {{#volume_secrets}}
+    {{#volume}}
     # The secret data is exposed to Containers in the Pod through a Volume.
     - name: {{name}}-volume
       secret:
         secretName: {{name}}
-    {{/volume_secrets}}
-{{/has_volumes}}
+    {{/volume}}
+{{/has_volume}}
 
   imagePullSecrets:
   - name: reg.osmhpi.de
 ---
-{{/pods}}
-{{#services}}
-{{#port}}
+{{/pod}}
+{{#service}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -50,9 +49,10 @@ spec:
   selector:
     app: {{name}}
   ports:
-  - port: {{port}}
+{{#port}}
+  - port: {{number}}
     targetPort: web
   type: LoadBalancer
----
 {{/port}}
-{{/services}}
+---
+{{/service}}

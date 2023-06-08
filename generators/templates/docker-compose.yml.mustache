@@ -1,21 +1,21 @@
 version: "3.9"
 services:
-  {{#services}}
+{{#service}}
     peer-{{name}}:
       build: {{build}}
       image: {{image}}
-{{#port}}
+      {{#port}}
       ports:
-        - {{port}}:{{port}}
+        - {{number}}:{{number}}
       environment:
-        - SERVER_PORT={{port}}
-{{/port}}
+        - SERVER_PORT={{number}}
+      {{/port}}
 
-{{#has_volume_mounts}}
+{{#has_volume}}
       volumes:
-      {{#volume_secrets}}
+      {{#volume}}
         - {{mount_from}}:{{mount_to}}:ro
-      {{/volume_secrets}}
-{{/has_volume_mounts}}
+      {{/volume}}
+{{/has_volume}}
 
-  {{/services}}
+{{/service}}

@@ -47,12 +47,6 @@ def read_file(path,filename):
         return f.read()
 
 
-def name2foldername(name):
-
-    name = name.replace(' ', '_')
-    
-    return name.lower()
-
 def name2componentname(name):
     p = re.split('[-_\s]+', name)
     p = list(map(  (lambda x : str(x[0]).upper() + x[1:]) ,p))
@@ -136,18 +130,11 @@ def clone_structures(structures):
 
     return msg_structures
 
-def get_asset_dictionary(sparql_wrapper,rdf_use):
-    data = {}
-    for (rdf_prop , rdf_value) in sparql_wrapper.get_out(rdf_use):
-        if not rdf_prop.startswith(MBA.ASSET_URL): 
-            continue
-        key = rdf_prop[len(MBA.ASSET_URL):]
-        data[key] = str(rdf_value)
-    return data
 
 def generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
     name = sparql_wrapper.get_single_object_property(rdf_component,MBA.name)
-    foldername = name2foldername(name)
+    foldername = snake_case(name)
+
     componentname = name2componentname(name)
 
     project_path = create_path(path,foldername)
@@ -248,60 +235,53 @@ def generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
 
     return foldername
 
+
+
+
+def get_asset_dictionary(sparql_wrapper,rdf_use):
+    data = {}
+    for (rdf_prop , rdf_value) in sparql_wrapper.get_out(rdf_use):
+        if not rdf_prop.startswith(MBA.ASSET_URL): 
+            continue
+        key = rdf_prop[len(MBA.ASSET_URL):]
+        data[key] = str(rdf_value)
+    for rdf_property in sparql_wrapper.get_out_references(rdf_use,MBA.has):
+        if sparql_wrapper.get_type(rdf_property) != MBA.Property:
+            continue
+        name = sparql_wrapper.get_single_object_property(rdf_property,MBA.name)
+        if name not in data:
+            data[name] = []
+            data["has_"+name] = True
+        data[name].append(get_asset_dictionary(sparql_wrapper,rdf_property))
+
+    return data
+
+
+
 def generate(graph,output_path):
 
     sparql_wrapper = SparQLWrapper(graph)
 
-    '''
-        Generate projects
-    '''
-    services = []
+    # Generate projects
     for rdf_component in sparql_wrapper.get_instances_of_type(MBA.Component):
         impl = sparql_wrapper.get_object_properties(rdf_component,MBA.implement)
         if 'dds' in impl:
             #print(rdf_component,impl)
-            project_path = generate_dds_project(sparql_wrapper,rdf_component,output_path)
-            project_name = project_path.replace("_","-")
-            service = {
-                "name" : f"{project_name}" , 
-                "build" : f"{project_path}",
-                "image" : f"reg.osmhpi.de/flexidug/{project_name}"
-            }
-
-            #if port
-            for rdf_interface in sparql_wrapper.get_out_references(rdf_component,MBA.provides):
-                ports = sparql_wrapper.get_object_properties(rdf_interface,MBA.portnumber)
-                if len(ports) >= 1:
-                    service['port'] = ports[0]
-
-            #if secrets
-            for rdf_use in sparql_wrapper.get_out_references(rdf_component,MBA.use):
-                if sparql_wrapper.get_type(rdf_use) == MBA.Secret:
-
-                    # docker
-                    service['has_volume_mounts'] = True
-                    service['has_volumes'] = True
-
-                    if 'volume_secrets' not in service:
-                        service['volume_secrets'] = []
-
-                    data = get_asset_dictionary(sparql_wrapper,rdf_use)
-                    service['volume_secrets'].append(data)
-
-            services.append(service)
+            _ = generate_dds_project(sparql_wrapper,rdf_component,output_path) 
 
 
-    docker_compose_yml = Template("templates/docker-compose.yml.mustache")
-    docker_compose_yml.set('services', services)
-    create_file(output_path,"docker-compose.yml",docker_compose_yml.content())
+    # Generate Assets
+    for rdf_asset in sparql_wrapper.get_instances_of_type(MBA.Asset):
+        name = sparql_wrapper.get_single_object_property(rdf_asset,MBA.name)
+        pattern = sparql_wrapper.get_single_object_property(rdf_asset,MBA.pattern)
+        #print("Generate Asset" , name, "with", pattern)
+        context = get_asset_dictionary(sparql_wrapper,rdf_asset)
+        asset_template = Template("templates/"+pattern)
+        asset_template.set_context(context)
+        create_file(output_path,name,asset_template.content())
 
-    #Helm chart
-    helm_chart_yaml = Template("templates/helm-chart.yml.mustache")
-    helm_chart_yaml.set('pods', services)
-    helm_chart_yaml.set('services', services)
-    create_file(output_path,"system.yml",helm_chart_yaml.content())
 
-    #Pipeline
-    gitlab_ci_yml = Template("templates/gitlab-ci.yml.mustache")
-    gitlab_ci_yml.set('services', services)
-    create_file(output_path,".gitlab-ci.yml",gitlab_ci_yml.content())
+
+          
+
+
