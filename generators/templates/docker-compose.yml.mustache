@@ -4,13 +4,18 @@ services:
     peer-{{name}}:
       build: {{build}}
       image: {{image}}
-      {{#port}}
+{{#has_port}}
       ports:
-        - {{number}}:{{number}}
-      environment:
-        - SERVER_PORT={{number}}
+      {{#port}}
+        - {{host_port}}:{{container_port}}
       {{/port}}
-
+{{/has_port}}
+{{#has_environment}}
+      environment:
+        {{#environment}}
+        - {{name}}={{value}}
+        {{/environment}}
+{{/has_environment}}
 {{#has_volume}}
       volumes:
       {{#volume}}

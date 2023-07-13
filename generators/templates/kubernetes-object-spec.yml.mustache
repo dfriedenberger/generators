@@ -9,14 +9,20 @@ spec:
   containers:
   - name: {{name}}
     image: {{image}}
-{{#port}}
+{{#has_port}}
     ports:
-    - containerPort: {{number}}
-      name: web
-    env:
-    - name: SERVER_PORT
-      value: {{number}}
+{{#port}}
+    - containerPort: {{container_port}}
+      name: {{container_port_name}}
 {{/port}}
+{{/has_port}}
+{{#has_environment}}
+    env:
+{{#environment}}    
+    - name: {{name}}
+      value: "{{value}}"
+{{/environment}}
+{{/has_environment}}
 {{#has_volume_mount}}
     volumeMounts:
     {{#volume_mount}}
@@ -51,7 +57,7 @@ spec:
   ports:
 {{#port}}
   - port: {{number}}
-    targetPort: web
+    targetPort: {{container_port_name}}
   type: LoadBalancer
 {{/port}}
 ---

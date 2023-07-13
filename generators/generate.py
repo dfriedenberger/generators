@@ -1,17 +1,24 @@
 import os
 import re
+import json
+
 from obse.sparql_queries import SparQLWrapper
 from obse.namespace import MBA
-from rdflib import URIRef
+from rdflib import URIRef, RDFS
+
 from .template import Template
 from .project_copier import ProjectCopier
 from .data.data_struct import DataStruct
 from .data.data_property import DataProperty
 from .util.util import snake_case
+from .util.namespaces import ANS
+
 from .base_data_structure_generator import DDSDataStructureGenerator, DataStructureGenerator
 from .component_proxy_interface_generator import ComponentProxyInterfaceGenerator
 from .dds_subscriber_generator import DDSSubscriberGenerator
 from .dds_data_structure_mapper_generator import DDSDataStructureMapperGenerator
+
+
 
 def create_path(path,subpath):
     if not os.path.exists(path):
@@ -238,21 +245,28 @@ def generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
 
 
 
-def get_asset_dictionary(sparql_wrapper,rdf_use):
-    data = {}
-    for (rdf_prop , rdf_value) in sparql_wrapper.get_out(rdf_use):
-        if not rdf_prop.startswith(MBA.ASSET_URL): 
-            continue
-        key = rdf_prop[len(MBA.ASSET_URL):]
-        data[key] = str(rdf_value)
-    for rdf_property in sparql_wrapper.get_out_references(rdf_use,MBA.has):
-        if sparql_wrapper.get_type(rdf_property) != MBA.Property:
-            continue
-        name = sparql_wrapper.get_single_object_property(rdf_property,MBA.name)
-        if name not in data:
-            data[name] = []
-            data["has_"+name] = True
-        data[name].append(get_asset_dictionary(sparql_wrapper,rdf_property))
+def get_asset_dictionary(sparql_wrapper : SparQLWrapper,rdf_use):
+    data = dict()
+
+    for rdf_key_value in sparql_wrapper.get_out_references(rdf_use,ANS.hasKeyValuePair):
+        
+        key = sparql_wrapper.get_single_object_property(rdf_key_value,ANS.key)
+        literals = sparql_wrapper.get_object_properties(rdf_key_value,ANS.valueAsLiteral)
+        rdf_classes = sparql_wrapper.get_out_references(rdf_key_value,ANS.valueAsClass)
+
+        if (len(literals) + len(rdf_classes)) != 1:
+            raise ValueError(f"Specification of values is invalid {literals} / {rdf_classes}")
+        if len(literals) == 1:
+            value = literals[0]
+            if key in data:
+                raise ValueError("Duplicate Entries for key {key} data: {data[key]} and {value}")
+            data[key] = value
+        else:
+            value = get_asset_dictionary(sparql_wrapper,rdf_classes[0])
+            if key not in data:
+                data[key] = []
+            data["has_"+key] = True
+            data[key].append(value)
 
     return data
 
@@ -271,14 +285,24 @@ def generate(graph,output_path):
 
 
     # Generate Assets
-    for rdf_asset in sparql_wrapper.get_instances_of_type(MBA.Asset):
-        name = sparql_wrapper.get_single_object_property(rdf_asset,MBA.name)
-        pattern = sparql_wrapper.get_single_object_property(rdf_asset,MBA.pattern)
-        #print("Generate Asset" , name, "with", pattern)
-        context = get_asset_dictionary(sparql_wrapper,rdf_asset)
-        asset_template = Template("templates/"+pattern)
+    for rdf_asset in sparql_wrapper.get_instances_of_type(ANS.Asset):
+        asset_name = sparql_wrapper.get_single_object_property(rdf_asset,RDFS.label)
+        asset_filename = sparql_wrapper.get_single_object_property(rdf_asset,ANS.filename)
+
+      
+        print("Generate Asset" , asset_name, " => ",asset_filename)
+
+        rdf_config = sparql_wrapper.get_single_out_reference(rdf_asset,ANS.hasConfiguration)
+        context = get_asset_dictionary(sparql_wrapper,rdf_config)
+        print(json.dumps(context,indent=4))
+
+        rdf_template = sparql_wrapper.get_single_out_reference(rdf_asset,ANS.hasTemplate)
+        template_filename = sparql_wrapper.get_single_object_property(rdf_template,ANS.filename)
+        print("template_filename",template_filename)
+
+        asset_template = Template("templates/"+template_filename)
         asset_template.set_context(context)
-        create_file(output_path,name,asset_template.content())
+        create_file(output_path,asset_filename,asset_template.content())
 
 
 
