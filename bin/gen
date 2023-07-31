@@ -17,15 +17,22 @@ def parse_args():
     parser.add_argument("--version", action='version', version=f'%(prog)s (version {__version__})')
     parser.add_argument("--model", required=True, metavar="INPUT", help="model")
     parser.add_argument("--path", required=True, metavar="OUTPUT", type=dir_path, help="output directory")
+    parser.add_argument("--sandbox", required=True, metavar="OUTPUT", type=dir_path, help="sandbox directory")
     args = parser.parse_args()
-    return args.model , args.path
+    return args.model , args.path, args.sandbox
 
 
 
-model, path = parse_args()
+model, root_path, sandbox_path = parse_args()
+
+config = {
+    "ROOT_DIRECTORY" : root_path,
+    "SANDBOX_DIRECTORY" : sandbox_path
+}
+
 
 graph = Graph()
 graph.parse(model)
 
 
-generate(graph,path)
+generate(graph,config)

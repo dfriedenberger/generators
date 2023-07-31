@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import shutil
 
 from obse.sparql_queries import SparQLWrapper
 from obse.namespace import MBA
@@ -34,6 +35,25 @@ def create_file(path,filename,content):
     p = os.path.join(path,filename)
     with open(p,'w',encoding='UTF-8') as f:
         f.write(content)
+
+
+def copy_file(dst_path,dst_filename,src_path,src_filename):
+
+    if not os.path.exists(dst_path):
+        raise ValueError(f"Destination path {dst_path} must exists.")
+    
+    if not os.path.exists(src_path):
+        raise ValueError(f"Source path {src_path} must exists.")
+
+    dst = os.path.join(dst_path,dst_filename)
+    src = os.path.join(src_path,src_filename)
+
+    if not os.path.exists(src):
+        raise ValueError(f"Source file {src} must exists.")
+
+    shutil.copyfile(src, dst)
+
+
 
 def read_lines(path,filename,must_exists = True):
     if not os.path.exists(path):
@@ -236,6 +256,8 @@ def generate_dds_project(sparql_wrapper: SparQLWrapper,rdf_component,path):
 
     # Create Dockerfile
     dockerfile = Template("templates/Dockerfile.mustache")
+    docker_from_txt = read_lines(proxy_path,"docker-from.txt",must_exists=True)
+    dockerfile.set("from",'\n'.join(docker_from_txt))
     docker_txt = read_lines(proxy_path,"docker.txt",must_exists=False)
     dockerfile.set("include",'\n'.join(docker_txt))
     create_file(project_path,"Dockerfile",dockerfile.content())
@@ -270,9 +292,28 @@ def get_asset_dictionary(sparql_wrapper : SparQLWrapper,rdf_use):
 
     return data
 
+def get_directory_path(sparql_wrapper : SparQLWrapper, rdf_directory : URIRef, config ):
+
+    directory_path = sparql_wrapper.get_single_object_property(rdf_directory,ANS.path)
+
+    while True:
+        rdf_parents = sparql_wrapper.get_in_references(rdf_directory,ANS.hasSubdirectory)
+        if len(rdf_parents) == 0:
+            break
+        if len(rdf_parents) == 1:
+            parent_path = sparql_wrapper.get_single_object_property(rdf_parents[0],ANS.path)
+
+            if "$" in parent_path:
+                parent_path = config[parent_path[1:]]
+            directory_path = os.path.join(parent_path,directory_path)
+            rdf_directory = rdf_parents[0]
+            continue
+        raise ValueError(f"{rdf_directory} has more than one parent {rdf_parents}")
+
+    return directory_path
 
 
-def generate(graph,output_path):
+def generate(graph,config):
 
     sparql_wrapper = SparQLWrapper(graph)
 
@@ -284,25 +325,48 @@ def generate(graph,output_path):
             _ = generate_dds_project(sparql_wrapper,rdf_component,output_path) 
 
 
+
+
     # Generate Assets
     for rdf_asset in sparql_wrapper.get_instances_of_type(ANS.Asset):
         asset_name = sparql_wrapper.get_single_object_property(rdf_asset,RDFS.label)
-        asset_filename = sparql_wrapper.get_single_object_property(rdf_asset,ANS.filename)
 
-      
-        print("Generate Asset" , asset_name, " => ",asset_filename)
+        rdf_target = sparql_wrapper.get_single_out_reference(rdf_asset,ANS.hasTarget)
+        
+        asset_filename = sparql_wrapper.get_single_object_property(rdf_target,ANS.filename)
+        rdf_directory = sparql_wrapper.get_single_out_reference(rdf_target,ANS.hasDirectory)
+       
+        asset_output_path = get_directory_path(sparql_wrapper,rdf_directory,config)
+        print(f"Generate Asset {asset_name} => {asset_output_path} / {asset_filename}")
 
-        rdf_config = sparql_wrapper.get_single_out_reference(rdf_asset,ANS.hasConfiguration)
-        context = get_asset_dictionary(sparql_wrapper,rdf_config)
-        print(json.dumps(context,indent=4))
+        if not os.path.exists(asset_output_path):
+            os.mkdir(asset_output_path)
 
-        rdf_template = sparql_wrapper.get_single_out_reference(rdf_asset,ANS.hasTemplate)
-        template_filename = sparql_wrapper.get_single_object_property(rdf_template,ANS.filename)
-        print("template_filename",template_filename)
+        rdf_sources = sparql_wrapper.get_out_references(rdf_asset,ANS.hasSource)
 
-        asset_template = Template("templates/"+template_filename)
-        asset_template.set_context(context)
-        create_file(output_path,asset_filename,asset_template.content())
+
+        if len(rdf_sources) == 1: # Copy Asset
+            asset_source_filename = sparql_wrapper.get_single_object_property(rdf_sources[0],ANS.filename)
+            rdf_source_directory = sparql_wrapper.get_single_out_reference(rdf_sources[0],ANS.hasDirectory)
+       
+            asset_source_path = get_directory_path(sparql_wrapper,rdf_source_directory,config)
+
+            copy_file(asset_output_path,asset_filename,asset_source_path,asset_source_filename)
+
+
+        else: #Generate Asset from Config and Template
+
+            rdf_config = sparql_wrapper.get_single_out_reference(rdf_asset,ANS.hasConfiguration)
+            context = get_asset_dictionary(sparql_wrapper,rdf_config)
+            print(json.dumps(context,indent=4))
+
+            rdf_template = sparql_wrapper.get_single_out_reference(rdf_asset,ANS.hasTemplate)
+            template_filename = sparql_wrapper.get_single_object_property(rdf_template,ANS.filename)
+            print("template_filename",template_filename)
+
+            asset_template = Template("templates/"+template_filename)
+            asset_template.set_context(context)
+            create_file(asset_output_path,asset_filename,asset_template.content())
 
 
 
