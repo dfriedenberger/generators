@@ -73,6 +73,8 @@ def get_asset_dictionary(sparql_wrapper : SparQLWrapper,rdf_use):
 def get_directory_path(sparql_wrapper : SparQLWrapper, rdf_directory : URIRef, config ):
 
     directory_path = sparql_wrapper.get_single_object_property(rdf_directory,ANS.path)
+    if "$" in directory_path:
+        directory_path = config[directory_path[1:]]
 
     while True:
         rdf_parents = sparql_wrapper.get_in_references(rdf_directory,ANS.hasSubdirectory)
@@ -80,9 +82,9 @@ def get_directory_path(sparql_wrapper : SparQLWrapper, rdf_directory : URIRef, c
             break
         if len(rdf_parents) == 1:
             parent_path = sparql_wrapper.get_single_object_property(rdf_parents[0],ANS.path)
-
             if "$" in parent_path:
                 parent_path = config[parent_path[1:]]
+
             directory_path = os.path.join(parent_path,directory_path)
             rdf_directory = rdf_parents[0]
             continue
