@@ -1,10 +1,10 @@
-import pkgutil
 import chevron
 
 class Template:
 
     def __init__(self,path):
-        self.data = pkgutil.get_data(__package__, path).decode('utf-8')
+        with open(path,'r',encoding="UTF-8") as f:
+            self.data = f.read()
         self.context = {}
     
     def set_context(self,context):
