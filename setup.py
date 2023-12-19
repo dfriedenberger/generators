@@ -1,7 +1,7 @@
 from setuptools import setup
 from generators import __version__
 
-setup(name='generators',
+setup(name='artifact-generator',
       version=__version__,
       description='Tool for generating assets from rdf model.',
       long_description=open('README.md', encoding="UTF-8").read(),
@@ -12,5 +12,5 @@ setup(name='generators',
       license='GPLv3',
       packages=['generators'],
       scripts=['bin/gen'],
-      install_requires=['chevron'],
+      install_requires=['chevron', 'rdflib', 'obse'],
       zip_safe=False)
