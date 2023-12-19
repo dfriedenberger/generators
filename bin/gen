@@ -1,15 +1,17 @@
 #!/usr/bin/env python
+import argparse
+import os
 from generators import __version__
 from generators.generate import generate
 from rdflib import Graph
-import argparse
-import os
+
 
 def dir_path(path):
     if os.path.isdir(path):
         return path
     else:
         raise argparse.ArgumentTypeError(f"{path} is not a valid path")
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Converting rdf model to system.")
@@ -19,15 +21,14 @@ def parse_args():
     parser.add_argument("--path", required=True, metavar="OUTPUT", type=dir_path, help="output directory")
     parser.add_argument("--sandbox", required=True, metavar="OUTPUT", type=dir_path, help="sandbox directory")
     args = parser.parse_args()
-    return args.model , args.path, args.sandbox
-
+    return args.model, args.path, args.sandbox
 
 
 model, root_path, sandbox_path = parse_args()
 
 config = {
-    "ROOT_DIRECTORY" : root_path,
-    "SANDBOX_DIRECTORY" : sandbox_path
+    "ROOT_DIRECTORY": root_path,
+    "SANDBOX_DIRECTORY": sandbox_path
 }
 
 
@@ -35,4 +36,4 @@ graph = Graph()
 graph.parse(model)
 
 
-generate(graph,config)
+generate(graph, config)
