@@ -1,5 +1,5 @@
 from setuptools import setup
-from rdf2puml import __version__
+from generators import __version__
 
 setup(name='generators',
       version=__version__,
