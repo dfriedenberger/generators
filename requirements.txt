@@ -1,4 +1,4 @@
 chevron==0.14.0
 obse==1.0.0
-rdflib==6.2.0
+rdflib==6.3.2
 setuptools==65.5.0
