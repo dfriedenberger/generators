@@ -5,7 +5,7 @@ Ontology Based System Engineering
 ## Installation
 
 ```bash
-pip install generators
+pip install artifact-generator
 ```
 
 ## Installation for development purposes
