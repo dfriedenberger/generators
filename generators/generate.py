@@ -108,8 +108,7 @@ def generate(graph, config):
         asset_output_path = get_directory_path(sparql_wrapper, rdf_directory, config)
         print(f"Generate Asset {asset_name} => {asset_output_path} / {asset_filename}")
 
-        if not os.path.exists(asset_output_path):
-            os.mkdir(asset_output_path)
+        os.makedirs(asset_output_path, exist_ok=True)
 
         rdf_sources = sparql_wrapper.get_out_references(rdf_asset, ANS.hasSource)
 
