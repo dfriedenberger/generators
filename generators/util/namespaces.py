@@ -4,6 +4,7 @@ from .ontology_reader import OntologyReader
 
 assetOntology = OntologyReader("models/assets-0.0.1.ttl")
 
+
 class ANS(DefinedNamespace):
     Asset: URIRef = assetOntology.get_class('#Asset')
     Target: URIRef = assetOntology.get_class('#Target')

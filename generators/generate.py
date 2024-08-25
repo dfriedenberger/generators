@@ -6,40 +6,58 @@ from rdflib import URIRef, RDFS
 
 from .template import Template
 from .util.namespaces import ANS
+from .util.generator_path import GeneratorPath
+
+
+def read_bytes(filename):
+    if not os.path.exists(filename):
+        return None
+    with open(filename, "rb") as f:
+        return f.read()
 
 
 def create_path(path, subpath):
     if not os.path.exists(path):
         raise ValueError(f"{path} must exists.")
-    p = os.path.join(path,subpath)
+    p = os.path.join(path, subpath)
     if not os.path.exists(p):
         os.makedirs(p)
     return p
 
 
-def create_file(path, filename, content):
-    if not os.path.exists(path):
-        raise ValueError(f"{path} must exists.")
-    p = os.path.join(path, filename)
-    with open(p,'w',encoding='UTF-8') as f:
-        f.write(content)
+def write_file(path, data):
+
+    old_data = read_bytes(path)
+    if old_data == data:
+        # print(f"No changes to {path}")
+        return
+
+    if old_data:
+        print(f"Update {path}")
+    else:
+        print(f"New {path}")
+
+    with open(path, 'wb') as f:
+        f.write(data)
 
 
-def copy_file(dst_path, dst_filename, src_path,src_filename):
+def create_file(dst_path, dst_filename, content, config):
 
-    if not os.path.exists(dst_path):
-        raise ValueError(f"Destination path {dst_path} must exists.")
+    data = bytes(content, 'utf-8')
+    path = os.path.join(dst_path.to_path(config, make_directory=True), dst_filename)
+    write_file(path, data)
 
-    if not os.path.exists(src_path):
-        raise ValueError(f"Source path {src_path} must exists.")
 
-    dst = os.path.join(dst_path, dst_filename)
-    src = os.path.join(src_path, src_filename)
+def copy_file(dst_path, dst_filename, src_path, src_filename, config):
 
+    src = os.path.join(src_path.to_path(config), src_filename)
     if not os.path.exists(src):
         raise ValueError(f"Source file {src} must exists.")
 
-    shutil.copyfile(src, dst)
+    path = os.path.join(dst_path.to_path(config, make_directory=True), dst_filename)
+    data = read_bytes(src)
+
+    write_file(path, data)
 
 
 def get_asset_dictionary(sparql_wrapper: SparQLWrapper, rdf_use):
@@ -68,58 +86,57 @@ def get_asset_dictionary(sparql_wrapper: SparQLWrapper, rdf_use):
     return data
 
 
-def get_directory_path(sparql_wrapper: SparQLWrapper, rdf_directory: URIRef, config):
+def get_directory_path(sparql_wrapper: SparQLWrapper, rdf_directory: URIRef):
 
     directory_path = sparql_wrapper.get_single_object_property(rdf_directory, ANS.path)
-    if "$" in directory_path:
-        directory_path = config[directory_path[1:]]
+    target = GeneratorPath(directory_path)
 
     while True:
         rdf_parents = sparql_wrapper.get_in_references(rdf_directory, ANS.hasSubdirectory)
         if len(rdf_parents) == 0:
             break
         if len(rdf_parents) == 1:
-            parent_path = sparql_wrapper.get_single_object_property(rdf_parents[0],ANS.path)
-            if "$" in parent_path:
-                parent_path = config[parent_path[1:]]
+            parent_path = sparql_wrapper.get_single_object_property(rdf_parents[0], ANS.path)
 
-            directory_path = os.path.join(parent_path, directory_path)
+            target.add_parent_path(parent_path)
             rdf_directory = rdf_parents[0]
             continue
         raise ValueError(f"{rdf_directory} has more than one parent {rdf_parents}")
 
-    return directory_path
+    return target
 
 
 def generate(graph, config):
 
     sparql_wrapper = SparQLWrapper(graph)
 
-
     # Generate Assets
     for rdf_asset in sparql_wrapper.get_instances_of_type(ANS.Asset):
         asset_name = sparql_wrapper.get_single_object_property(rdf_asset, RDFS.label)
 
         rdf_target = sparql_wrapper.get_single_out_reference(rdf_asset, ANS.hasTarget)
-        
+
         asset_filename = sparql_wrapper.get_single_object_property(rdf_target, ANS.filename)
         rdf_directory = sparql_wrapper.get_single_out_reference(rdf_target, ANS.hasDirectory)
-       
-        asset_output_path = get_directory_path(sparql_wrapper, rdf_directory, config)
-        print(f"Generate Asset {asset_name} => {asset_output_path} / {asset_filename}")
 
-        if not os.path.exists(asset_output_path):
-            os.mkdir(asset_output_path)
+        asset_output_path = get_directory_path(sparql_wrapper, rdf_directory)
+
+        print(f'Generate Asset "{asset_name}" => {asset_output_path.path} / {asset_filename}')
 
         rdf_sources = sparql_wrapper.get_out_references(rdf_asset, ANS.hasSource)
+
+        # sort
+        # 1 Generate SANDBOX_DIRECTORY
+        # 2 Generate ROOT_DIRECTORY
+        # 3 Copy from SANDBOX to ROOT_DIRECTORY
 
         if len(rdf_sources) == 1:  # Copy Asset
             asset_source_filename = sparql_wrapper.get_single_object_property(rdf_sources[0], ANS.filename)
             rdf_source_directory = sparql_wrapper.get_single_out_reference(rdf_sources[0], ANS.hasDirectory)
 
-            asset_source_path = get_directory_path(sparql_wrapper, rdf_source_directory, config)
+            asset_source_path = get_directory_path(sparql_wrapper, rdf_source_directory)
 
-            copy_file(asset_output_path, asset_filename, asset_source_path, asset_source_filename)
+            copy_file(asset_output_path, asset_filename, asset_source_path, asset_source_filename, config)
 
         else:  # Generate Asset from Config and Template
 
@@ -133,7 +150,7 @@ def generate(graph, config):
 
             asset_template = Template("templates/"+template_filename)
             asset_template.set_context(context)
-            create_file(asset_output_path, asset_filename, asset_template.content())
+            create_file(asset_output_path, asset_filename, asset_template.content(), config)
 
 
 
