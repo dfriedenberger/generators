@@ -110,6 +110,11 @@ def generate(graph, config):
 
     sparql_wrapper = SparQLWrapper(graph)
 
+    processes = [
+        {'name': 'Sandbox', 'ds': []},
+        {'name': 'Target-System', 'ds': []}
+    ]
+
     # Generate Assets
     for rdf_asset in sparql_wrapper.get_instances_of_type(ANS.Asset):
         asset_name = sparql_wrapper.get_single_object_property(rdf_asset, RDFS.label)
@@ -121,36 +126,45 @@ def generate(graph, config):
 
         asset_output_path = get_directory_path(sparql_wrapper, rdf_directory)
 
-        print(f'Generate Asset "{asset_name}" => {asset_output_path.path} / {asset_filename}')
+        # print(f'Generate Asset "{asset_name}" => {asset_output_path.path} / {asset_filename}')
 
         rdf_sources = sparql_wrapper.get_out_references(rdf_asset, ANS.hasSource)
 
-        # sort
-        # 1 Generate SANDBOX_DIRECTORY
-        # 2 Generate ROOT_DIRECTORY
-        # 3 Copy from SANDBOX to ROOT_DIRECTORY
+        dataset = (rdf_asset, asset_name, asset_output_path, asset_filename, rdf_sources)
 
-        if len(rdf_sources) == 1:  # Copy Asset
-            asset_source_filename = sparql_wrapper.get_single_object_property(rdf_sources[0], ANS.filename)
-            rdf_source_directory = sparql_wrapper.get_single_out_reference(rdf_sources[0], ANS.hasDirectory)
+        if asset_output_path.get_root() == '$SANDBOX_DIRECTORY':
+            processes[0]['ds'].append(dataset)
+        elif asset_output_path.get_root() == '$ROOT_DIRECTORY':
+            processes[1]['ds'].append(dataset)
+        else:
+            raise ValueError(f"Unknown root path {asset_output_path.get_root()}")
 
-            asset_source_path = get_directory_path(sparql_wrapper, rdf_source_directory)
+    for process in processes:
+        dataset = process['ds']
+        print(f"Prozess {process['name']} Items {len(dataset)}")
+      
+        for (rdf_asset, asset_name, asset_output_path, asset_filename, rdf_sources) in dataset:
+            if len(rdf_sources) == 1:  # Copy Asset
+                asset_source_filename = sparql_wrapper.get_single_object_property(rdf_sources[0], ANS.filename)
+                rdf_source_directory = sparql_wrapper.get_single_out_reference(rdf_sources[0], ANS.hasDirectory)
 
-            copy_file(asset_output_path, asset_filename, asset_source_path, asset_source_filename, config)
+                asset_source_path = get_directory_path(sparql_wrapper, rdf_source_directory)
 
-        else:  # Generate Asset from Config and Template
+                copy_file(asset_output_path, asset_filename, asset_source_path, asset_source_filename, config)
 
-            rdf_config = sparql_wrapper.get_single_out_reference(rdf_asset, ANS.hasConfiguration)
-            context = get_asset_dictionary(sparql_wrapper, rdf_config)
-            # print(json.dumps(context,indent=4))
+            else:  # Generate Asset from Config and Template
 
-            rdf_template = sparql_wrapper.get_single_out_reference(rdf_asset, ANS.hasTemplate)
-            template_filename = sparql_wrapper.get_single_object_property(rdf_template, ANS.filename)
-            # print("template_filename",template_filename)
+                rdf_config = sparql_wrapper.get_single_out_reference(rdf_asset, ANS.hasConfiguration)
+                context = get_asset_dictionary(sparql_wrapper, rdf_config)
+                # print(json.dumps(context,indent=4))
 
-            asset_template = Template("templates/"+template_filename)
-            asset_template.set_context(context)
-            create_file(asset_output_path, asset_filename, asset_template.content(), config)
+                rdf_template = sparql_wrapper.get_single_out_reference(rdf_asset, ANS.hasTemplate)
+                template_filename = sparql_wrapper.get_single_object_property(rdf_template, ANS.filename)
+                # print("template_filename",template_filename)
+
+                asset_template = Template("templates/"+template_filename)
+                asset_template.set_context(context)
+                create_file(asset_output_path, asset_filename, asset_template.content(), config)
 
 
 
