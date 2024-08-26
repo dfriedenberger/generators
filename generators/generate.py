@@ -7,13 +7,10 @@ from rdflib import URIRef, RDFS
 from .template import Template
 from .util.namespaces import ANS
 from .util.generator_path import GeneratorPath
+from .util.file_manager import FileManager
 
 
-def read_bytes(filename):
-    if not os.path.exists(filename):
-        return None
-    with open(filename, "rb") as f:
-        return f.read()
+
 
 
 def create_path(path, subpath):
@@ -25,39 +22,8 @@ def create_path(path, subpath):
     return p
 
 
-def write_file(path, data):
-
-    old_data = read_bytes(path)
-    if old_data == data:
-        # print(f"No changes to {path}")
-        return
-
-    if old_data:
-        print(f"Update {path}")
-    else:
-        print(f"New {path}")
-
-    with open(path, 'wb') as f:
-        f.write(data)
 
 
-def create_file(dst_path, dst_filename, content, config):
-
-    data = bytes(content, 'utf-8')
-    path = os.path.join(dst_path.to_path(config, make_directory=True), dst_filename)
-    write_file(path, data)
-
-
-def copy_file(dst_path, dst_filename, src_path, src_filename, config):
-
-    src = os.path.join(src_path.to_path(config), src_filename)
-    if not os.path.exists(src):
-        raise ValueError(f"Source file {src} must exists.")
-
-    path = os.path.join(dst_path.to_path(config, make_directory=True), dst_filename)
-    data = read_bytes(src)
-
-    write_file(path, data)
 
 
 def get_asset_dictionary(sparql_wrapper: SparQLWrapper, rdf_use):
@@ -106,13 +72,23 @@ def get_directory_path(sparql_wrapper: SparQLWrapper, rdf_directory: URIRef):
     return target
 
 
-def generate(graph, config):
+def generate(graph, config, sandbox_only, show_unused):
 
     sparql_wrapper = SparQLWrapper(graph)
 
     processes = [
-        {'name': 'Sandbox', 'ds': []},
-        {'name': 'Target-System', 'ds': []}
+        {
+            'name': 'Sandbox',
+            'path': 'SANDBOX_DIRECTORY',
+            'sandbox': True,
+            'ds': []
+        },
+        {
+            'name': 'Target-System',
+            'path': 'ROOT_DIRECTORY',
+            'sandbox': False,
+            'ds': []
+        }
     ]
 
     # Generate Assets
@@ -141,8 +117,11 @@ def generate(graph, config):
 
     for process in processes:
         dataset = process['ds']
+        if sandbox_only and not process['sandbox']:
+            continue
+
         print(f"Prozess {process['name']} Items {len(dataset)}")
-      
+        file_manager = FileManager(config[process['path']], config)
         for (rdf_asset, asset_name, asset_output_path, asset_filename, rdf_sources) in dataset:
             if len(rdf_sources) == 1:  # Copy Asset
                 asset_source_filename = sparql_wrapper.get_single_object_property(rdf_sources[0], ANS.filename)
@@ -150,7 +129,7 @@ def generate(graph, config):
 
                 asset_source_path = get_directory_path(sparql_wrapper, rdf_source_directory)
 
-                copy_file(asset_output_path, asset_filename, asset_source_path, asset_source_filename, config)
+                file_manager.copy_file(asset_output_path, asset_filename, asset_source_path, asset_source_filename)
 
             else:  # Generate Asset from Config and Template
 
@@ -164,10 +143,8 @@ def generate(graph, config):
 
                 asset_template = Template("templates/"+template_filename)
                 asset_template.set_context(context)
-                create_file(asset_output_path, asset_filename, asset_template.content(), config)
+                file_manager.create_file(asset_output_path, asset_filename, asset_template.content())
 
-
-
-          
-
+        if not process['sandbox'] and show_unused:
+            file_manager.remove_files()
 

@@ -20,11 +20,14 @@ def parse_args():
     parser.add_argument("--model", required=True, metavar="INPUT", help="model")
     parser.add_argument("--path", required=True, metavar="OUTPUT", type=dir_path, help="output directory")
     parser.add_argument("--sandbox", required=True, metavar="OUTPUT", type=dir_path, help="sandbox directory")
+    parser.add_argument('--sandbox-only', action=argparse.BooleanOptionalAction)
+    parser.add_argument('--show-unused', action=argparse.BooleanOptionalAction)
+
     args = parser.parse_args()
-    return args.model, args.path, args.sandbox
+    return args.model, args.path, args.sandbox, args.sandbox_only, args.show_unused
 
 
-model, root_path, sandbox_path = parse_args()
+model, root_path, sandbox_path, sandbox_only, show_unused = parse_args()
 
 config = {
     "ROOT_DIRECTORY": root_path,
@@ -36,4 +39,4 @@ graph = Graph()
 graph.parse(model)
 
 
-generate(graph, config)
+generate(graph, config, sandbox_only, show_unused)

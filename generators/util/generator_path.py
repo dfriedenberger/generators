@@ -12,6 +12,12 @@ class GeneratorPath:
     def get_root(self):
         return self.path[0]
 
+    def to_rel_path(self):
+        directory_path = "."
+        for part in self.path[1:]:
+            directory_path = os.path.join(directory_path, part)
+
+        return directory_path
     def to_path(self, config, make_directory=False):
 
         directory_path = self.path[0]
