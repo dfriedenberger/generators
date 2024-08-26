@@ -17,12 +17,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Converting rdf model to system.")
 
     parser.add_argument("--version", action='version', version=f'%(prog)s (version {__version__})')
-    parser.add_argument("--model", required=True, metavar="INPUT", help="model")
+    parser.add_argument("--model", required=True, metavar="INPUT", help="model file in RDF format")
     parser.add_argument("--path", required=True, metavar="OUTPUT", type=dir_path, help="output directory")
     parser.add_argument("--sandbox", required=True, metavar="OUTPUT", type=dir_path, help="sandbox directory")
-    parser.add_argument('--sandbox-only', action=argparse.BooleanOptionalAction)
-    parser.add_argument('--show-unused', action=argparse.BooleanOptionalAction)
-
+    parser.add_argument("--sandbox-only", action='store_true', help="Only generate sandbox")
+    parser.add_argument('--show-unused', action='store_true', help="Show unused (not generated) files")
     args = parser.parse_args()
     return args.model, args.path, args.sandbox, args.sandbox_only, args.show_unused
 
