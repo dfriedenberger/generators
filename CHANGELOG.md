@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2024-08-26
+### Fixed
+- Fix flag command line arguments, add help
+
 ## [1.1.0] - 2024-08-26
 ### Changed
 - Write File only if has changed or is new
