@@ -10,22 +10,6 @@ from .util.generator_path import GeneratorPath
 from .util.file_manager import FileManager
 
 
-
-
-
-def create_path(path, subpath):
-    if not os.path.exists(path):
-        raise ValueError(f"{path} must exists.")
-    p = os.path.join(path, subpath)
-    if not os.path.exists(p):
-        os.makedirs(p)
-    return p
-
-
-
-
-
-
 def get_asset_dictionary(sparql_wrapper: SparQLWrapper, rdf_use):
     data = dict()
 
@@ -147,4 +131,3 @@ def generate(graph, config, sandbox_only, show_unused):
 
         if not process['sandbox'] and show_unused:
             file_manager.remove_files()
-

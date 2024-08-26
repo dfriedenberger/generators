@@ -22,7 +22,7 @@ class FileManager:
 
     def _register_file(self, path):
         if path not in self.cache:
-            raise ValueError(f"{path} not found in {self.cache}")
+            return
         self.cache.remove(path)
 
     def _read_bytes(self, filename):
