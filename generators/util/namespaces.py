@@ -2,7 +2,7 @@ from rdflib.namespace import DefinedNamespace
 from rdflib import URIRef
 from .ontology_reader import OntologyReader
 
-assetOntology = OntologyReader("models/assets-0.0.1.ttl")
+assetOntology = OntologyReader("models/assets-0.0.2.ttl")
 
 
 class ANS(DefinedNamespace):
@@ -19,8 +19,7 @@ class ANS(DefinedNamespace):
     filename: URIRef = assetOntology.get_datatype_property('#filename')
     path: URIRef = assetOntology.get_datatype_property('#path')
     key: URIRef = assetOntology.get_datatype_property('#key')
-    valueAsLiteral: URIRef = assetOntology.get_datatype_property('#valueAsLiteral')
-    valueAsClass: URIRef = assetOntology.get_object_property('#valueAsClass')
+    value: URIRef = assetOntology.get_datatype_property('#value')
 
     hasTarget: URIRef = assetOntology.get_object_property('#hasTarget')
     hasSource: URIRef = assetOntology.get_object_property('#hasSource')

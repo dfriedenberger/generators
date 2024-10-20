@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2024-10-20
+### Changed
+- use asset ontology 0.0.2
+### Fixed
+- handle sorted lists via rdf:Seq
+
 ## [1.1.1] - 2024-08-26
 ### Fixed
 - Fix flag command line arguments, add help

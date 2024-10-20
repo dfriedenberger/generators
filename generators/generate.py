@@ -1,5 +1,6 @@
 import os
 import shutil
+import json
 
 from obse.sparql_queries import SparQLWrapper
 from rdflib import URIRef, RDFS
@@ -8,32 +9,7 @@ from .template import Template
 from .util.namespaces import ANS
 from .util.generator_path import GeneratorPath
 from .util.file_manager import FileManager
-
-
-def get_asset_dictionary(sparql_wrapper: SparQLWrapper, rdf_use):
-    data = dict()
-
-    for rdf_key_value in sparql_wrapper.get_out_references(rdf_use, ANS.hasKeyValuePair):
-
-        key = sparql_wrapper.get_single_object_property(rdf_key_value, ANS.key)
-        literals = sparql_wrapper.get_object_properties(rdf_key_value, ANS.valueAsLiteral)
-        rdf_classes = sparql_wrapper.get_out_references(rdf_key_value, ANS.valueAsClass)
-
-        if (len(literals) + len(rdf_classes)) != 1:
-            raise ValueError(f"Specification of values is invalid {literals} / {rdf_classes}")
-        if len(literals) == 1:
-            value = literals[0]
-            if key in data:
-                raise ValueError("Duplicate Entries for key {key} data: {data[key]} and {value}")
-            data[key] = value
-        else:
-            value = get_asset_dictionary(sparql_wrapper, rdf_classes[0])
-            if key not in data:
-                data[key] = []
-            data["has_"+key] = True
-            data[key].append(value)
-
-    return data
+from .util.rdf2json import process_key_value_pairs
 
 
 def get_directory_path(sparql_wrapper: SparQLWrapper, rdf_directory: URIRef):
@@ -118,8 +94,8 @@ def generate(graph, config, sandbox_only, show_unused):
             else:  # Generate Asset from Config and Template
 
                 rdf_config = sparql_wrapper.get_single_out_reference(rdf_asset, ANS.hasConfiguration)
-                context = get_asset_dictionary(sparql_wrapper, rdf_config)
-                # print(json.dumps(context,indent=4))
+                context = process_key_value_pairs(sparql_wrapper, rdf_config)
+                # print(json.dumps(context, indent=4))
 
                 rdf_template = sparql_wrapper.get_single_out_reference(rdf_asset, ANS.hasTemplate)
                 template_filename = sparql_wrapper.get_single_object_property(rdf_template, ANS.filename)
@@ -128,6 +104,7 @@ def generate(graph, config, sandbox_only, show_unused):
                 asset_template = Template("templates/"+template_filename)
                 asset_template.set_context(context)
                 file_manager.create_file(asset_output_path, asset_filename, asset_template.content())
+                # print(asset_output_path.to_rel_path(), asset_filename)
 
         if not process['sandbox'] and show_unused:
             file_manager.remove_files()
